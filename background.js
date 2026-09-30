@@ -1,9 +1,16 @@
 const api=globalThis.browser||globalThis.chrome;
 api.runtime.onInstalled.addListener(()=>{try{api.sidePanel?.setOptions?.({path:"sidepanel/index.html"}).catch?.(()=>{})}catch(e){}});
-if(api.action?.onClicked&&api.sidePanel?.open){
+if(api.action?.onClicked){
  api.action.onClicked.addListener(async tab=>{
-  try{await api.sidePanel.open({windowId:tab.windowId})}
-  catch(e){try{await api.sidePanel.setPanelBehavior({openPanelOnActionClick:true})}catch(_){}}
+  try{
+   if(tab?.id&&api.scripting?.executeScript){
+    await api.scripting.executeScript({target:{tabId:tab.id},files:["content.js"]});
+   }
+  }catch(e){}
+  try{
+   if(api.sidePanel?.open&&tab?.windowId!=null)await api.sidePanel.open({windowId:tab.windowId});
+   else if(api.sidePanel?.setPanelBehavior)await api.sidePanel.setPanelBehavior({openPanelOnActionClick:true});
+  }catch(e){try{await api.sidePanel?.setPanelBehavior?.({openPanelOnActionClick:true})}catch(_){}}
  });
 }
 api.runtime.onMessage.addListener((message,sender,sendResponse)=>{
