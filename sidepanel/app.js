@@ -54,7 +54,7 @@ if($("makeProtocol"))$("makeProtocol").onclick=async()=>{const t=$("meetingText"
 Вопросы:\
 "+(a.questions.join("\
 ")||"Не определено"))};
-if($("addMeetingLink"))$("addMeetingLink").onclick=async()=>{const u=$("dionLink").value.trim();if(!/^https:\\/\\/dion\\.vc\\/event\\/[^\\s]+$/i.test(u))return alert("Ожидается ссылка вида https://dion.vc/event/названиекмнаты");await ingest({type:"dion",title:"Встреча DION",text:"Ссылка на встречу: "+u,sourceReference:u,url:u});$("meetingLinkResult").textContent="Встреча добавлена в Work Context: "+u};
+if($("addMeetingLink"))$("addMeetingLink").onclick=async()=>{const u=$("dionLink").value.trim();if(!/^https:\/\/dion\.vc\/event\/[^\s]+$/i.test(u))return alert("Ожидается ссылка вида https://dion.vc/event/названиекмнаты");await ingest({type:"dion",title:"Встреча DION",text:"Ссылка на встречу: "+u,sourceReference:u,url:u});$("meetingLinkResult").textContent="Встреча добавлена в Work Context: "+u};
 if($("ask"))$("ask").onclick=async()=>{const q=$("chatInput").value.trim();if(!q)return;const r=await WC.ai.ask(q,ctx.data);$("chatLog").innerHTML+=`<div class="msg user">${esc(q)}</div><div class="msg ai">${esc(r.text)}</div>`;$("chatInput").value=""};
 document.querySelectorAll("[data-remove]").forEach(b=>b.onclick=async()=>{await ctx.removeDocument(b.dataset.remove);render()});
 document.querySelectorAll("[data-analyze]").forEach(b=>b.onclick=()=>{const d=ctx.data.documents.find(x=>x.id===b.dataset.analyze);if(!d)return;currentTab="analysis";render();setTimeout(()=>renderReqResults(WC.requirements.atomicize(d.text,d.id,d.title)),0)});
