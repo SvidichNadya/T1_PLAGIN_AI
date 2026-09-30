@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Work Copilot",
+  "version": "1.0.0",
+  "description": "Local-first corporate work assistant.",
+  "permissions": ["activeTab", "sidePanel", "storage", "scripting"],
+  "action": {"default_title": "Work Copilot"},
+  "background": {"service_worker": "background.js"},
+  "side_panel": {"default_path": "sidepanel/index.html"},
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }],
+  "host_permissions": [],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  }
+}
