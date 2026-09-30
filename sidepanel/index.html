@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Work Copilot</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><span class="logo">✦</span><div><b>WORK COPILOT</b><small>LOCAL WORKSPACE</small></div></div>
+    <button id="clearBtn" class="icon" title="Очистить сессию">⌫</button>
+  </header>
+  <section class="workspace">
+    <div class="task-head">
+      <input id="taskName" placeholder="Название рабочей задачи">
+      <div class="chips"><span id="docCount">0 документов</span><span id="taskCount">0 задач</span><span id="issueCount">0 проблем</span></div>
+    </div>
+  </section>
+  <nav class="tabs">
+    <button data-tab="task" class="active">Задача</button>
+    <button data-tab="docs">Документы</button>
+    <button data-tab="mail">Почта</button>
+    <button data-tab="meetings">Встречи</button>
+    <button data-tab="tasks">Задачи</button>
+    <button data-tab="analysis">Анализ</button>
+    <button data-tab="chat">Чат</button>
+  </nav>
+  <main id="content"></main>
+</div>
+<script src="../core/utils.js"></script>
+<script src="../core/model.js"></script>
+<script src="../core/extract.js"></script>
+<script src="../core/analyze.js"></script>
+<script src="../core/context.js"></script>
+<script src="../core/ai.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
