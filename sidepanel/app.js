@@ -13,17 +13,13 @@ async function init(){
  render();
 }
 async function clearContext(){if(!confirm("Очистить текущий контекст разработки?"))return;await ctx.clear();agentResult=null;analysisCache=null;render()}
-async function getActiveTab(){const tabs=await WC.api.tabs.query({active:true,currentWindow:true});const tab=tabs&&tabs[0];if(!tab?.id)throw Error("Не удалось определить активную вкладку.");return tab}
-async function ensureContentScript(tabId){
- try{await WC.api.tabs.sendMessage(tabId,{type:"PING"});return}
- catch(_){}
- try{await WC.api.scripting.executeScript({target:{tabId},files:["content.js"]})}
- catch(e){throw Error("Браузер не разрешил доступ к текущей странице. Откройте обычную корпоративную страницу и повторите действие.")}
-}
 async function sendToPage(message){
- const tab=await getActiveTab();
- await ensureContentScript(tab.id);
- return await new Promise(resolve=>WC.api.tabs.sendMessage(tab.id,message,r=>resolve(WC.api.runtime.lastError?{ok:false,error:WC.api.runtime.lastError.message}:r)));
+ return await new Promise(resolve=>{
+  WC.api.runtime.sendMessage({type:"PAGE_REQUEST",request:message},r=>{
+   const err=WC.api.runtime.lastError;
+   resolve(err?{ok:false,error:err.message}:r);
+  });
+ });
 }
 async function pageExtract(mode){
  const r=await sendToPage({type:"EXTRACT_PAGE"});
