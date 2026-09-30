@@ -1,5 +1,6 @@
 (() => {
-  if (window.__WORK_COPILOT_CONTENT__) { /* listeners are already installed */ }
+  if (window.__WORK_COPILOT_CONTENT_VERSION__ === "2") return;
+  window.__WORK_COPILOT_CONTENT_VERSION__ = "2";
   window.__WORK_COPILOT_CONTENT__ = true;
   const visible=el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>0&&r.height>0};
   const textOf=el=>(el.innerText||el.textContent||"").replace(/\u00a0/g," ").replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
