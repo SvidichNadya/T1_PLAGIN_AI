@@ -1,29 +1,18 @@
 (() => {
   if (window.__WORK_COPILOT_CONTENT__) return;
   window.__WORK_COPILOT_CONTENT__ = true;
-  const visible = el => { const s=getComputedStyle(el),r=el.getBoundingClientRect(); return s.display!=="none"&&s.visibility!=="hidden"&&r.width>0&&r.height>0; };
-  const textOf = el => (el.innerText||el.textContent||"").replace(/\u00a0/g," ").replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
-  function extract(){
-    const root=document.body;if(!root)return{title:document.title,url:location.href,text:""};
-    const clone=root.cloneNode(true);clone.querySelectorAll("script,style,noscript,template,svg,canvas").forEach(x=>x.remove());
-    const main=Array.from(clone.querySelectorAll("main,article,[role='main'],section")).sort((a,b)=>textOf(b).length-textOf(a).length)[0]||clone;
-    return{title:document.title||"Без названия",url:location.href,text:textOf(main),selection:String(window.getSelection?window.getSelection():"").trim()};
-  }
+  const visible=el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>0&&r.height>0};
+  const textOf=el=>(el.innerText||el.textContent||"").replace(/\u00a0/g," ").replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
+  function extract(){const root=document.body;if(!root)return{title:document.title,url:location.href,text:""};const clone=root.cloneNode(true);clone.querySelectorAll("script,style,noscript,template,svg,canvas").forEach(x=>x.remove());const main=Array.from(clone.querySelectorAll("main,article,[role='main'],section")).sort((a,b)=>textOf(b).length-textOf(a).length)[0]||clone;return{title:document.title||"Без названия",url:location.href,text:textOf(main),selection:String(window.getSelection?window.getSelection():"").trim()}}
   function findLabel(words){return [...document.querySelectorAll("input,textarea,[contenteditable='true'],[role='textbox']")].filter(visible).find(el=>words.some(w=>(el.getAttribute("aria-label")||el.getAttribute("placeholder")||el.getAttribute("name")||"").toLowerCase().includes(w)))}
   function setValue(el,value){if(!el)return false;el.focus();if(el.isContentEditable)el.textContent=value;else{const p=el.tagName==="TEXTAREA"?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;const setter=Object.getOwnPropertyDescriptor(p,"value")?.set;if(setter)setter.call(el,value);else el.value=value}el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));return true}
   function clickText(words){const e=[...document.querySelectorAll("button,a,[role='button'],input[type='button'],input[type='submit']")].filter(visible).find(x=>words.some(w=>textOf(x).toLowerCase().includes(w)));if(e){e.click();return true}return false}
-  chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
-    if(msg.type==="EXTRACT_PAGE"){try{sendResponse({ok:true,data:extract()})}catch(e){sendResponse({ok:false,error:String(e)})}}
-    if(msg.type==="EXTRACT_SELECTION")sendResponse({ok:true,text:String(window.getSelection?window.getSelection():"").trim()});
-    if(msg.type==="CREATE_CALENDAR_EVENT"){
-      const e=msg.event||{};let changed=0;
-      changed+=setValue(findLabel(["название","тема","title","subject"]),e.title)?1:0;
-      changed+=setValue(findLabel(["дата","date"]),e.date)?1:0;
-      changed+=setValue(findLabel(["время","time"]),e.time)?1:0;
-      changed+=setValue(findLabel(["описание","description","комментар"]),e.description)?1:0;
-      if(!changed){sendResponse({ok:false,error:"Не удалось определить поля календаря. Откройте форму создания события VK Workspace и повторите."});return}
-      const submitted=clickText(["создать","сохранить","добавить событие","create","save"]);
-      sendResponse({ok:true,fieldsChanged:changed,submitted});
-    }
-  });
+  function noteOverlay(contextName){if(document.getElementById("__wc_note_overlay"))return;const root=document.createElement("div");root.id="__wc_note_overlay";root.innerHTML='<div id="__wc_note_window"><div id="__wc_note_bar"><b>✎ Work Copilot · Быстрая заметка</b><button id="__wc_note_close">×</button></div><textarea id="__wc_note_text" placeholder="Пишите заметку поверх текущей страницы…"></textarea><div id="__wc_note_footer"><span>'+contextName.replace(/[<>]/g,"")+'</span><button id="__wc_note_save">Сохранить в контекст</button></div></div>';document.documentElement.appendChild(root);const style=document.createElement("style");style.textContent='#__wc_note_overlay{position:fixed;inset:0;z-index:2147483647;pointer-events:none;font-family:Inter,Segoe UI,Arial,sans-serif}#__wc_note_window{position:fixed;left:24px;top:100px;width:380px;max-width:calc(100vw - 30px);background:#101D49;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:22px;box-shadow:0 25px 80px rgba(0,0,0,.55);overflow:hidden;pointer-events:auto}#__wc_note_bar{height:44px;padding:0 10px 0 13px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#18254D,#29136F);cursor:move;user-select:none}#__wc_note_bar button{width:30px;height:30px;border:0;border-radius:15px;background:rgba(255,255,255,.08);color:#fff;font-size:18px}#__wc_note_text{display:block;width:100%;height:220px;padding:14px;border:0;outline:0;resize:both;background:#07133D;color:#fff;box-sizing:border-box}#__wc_note_footer{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;color:#9CA8C5;font-size:10px}#__wc_note_save{border:0;border-radius:13px;padding:9px 11px;background:#FF5A3D;color:#fff}';document.documentElement.appendChild(style);const w=document.getElementById("__wc_note_window"),bar=document.getElementById("__wc_note_bar");let drag=false,dx=0,dy=0;bar.onpointerdown=e=>{drag=true;dx=e.clientX-w.offsetLeft;dy=e.clientY-w.offsetTop;bar.setPointerCapture(e.pointerId)};bar.onpointermove=e=>{if(!drag)return;w.style.left=Math.max(5,Math.min(innerWidth-w.offsetWidth,e.clientX-dx))+"px";w.style.top=Math.max(5,Math.min(innerHeight-w.offsetHeight,e.clientY-dy))+"px"};bar.onpointerup=()=>drag=false;document.getElementById("__wc_note_close").onclick=()=>root.remove();document.getElementById("__wc_note_save").onclick=()=>{const text=document.getElementById("__wc_note_text").value.trim();if(!text)return;chrome.runtime.sendMessage({type:"SAVE_QUICK_NOTE",text,contextName},r=>{if(r?.ok)root.remove()})}}
+  chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{try{
+    if(msg.type==="EXTRACT_PAGE"){sendResponse({ok:true,data:extract()});return}
+    if(msg.type==="EXTRACT_SELECTION"){sendResponse({ok:true,text:String(window.getSelection?window.getSelection():"").trim()});return}
+    if(msg.type==="OPEN_NOTE_OVERLAY"){noteOverlay(msg.contextName||"Текущий контекст");sendResponse({ok:true});return}
+    if(msg.type==="CLOSE_NOTE_OVERLAY"){document.getElementById("__wc_note_overlay")?.remove();sendResponse({ok:true});return}
+    if(msg.type==="CREATE_CALENDAR_EVENT"){const e=msg.event||{};let changed=0;changed+=setValue(findLabel(["название","тема","title","subject"]),e.title)?1:0;changed+=setValue(findLabel(["дата","date"]),e.date)?1:0;changed+=setValue(findLabel(["время","time"]),e.time)?1:0;changed+=setValue(findLabel(["описание","description","комментар"]),e.description)?1:0;if(!changed){sendResponse({ok:false,error:"Не удалось определить поля календаря."});return}sendResponse({ok:true,fieldsChanged:changed,submitted:clickText(["создать","сохранить","добавить событие","create","save"])});return}
+  }catch(e){sendResponse({ok:false,error:String(e)})}});
 })();
