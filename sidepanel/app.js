@@ -100,8 +100,10 @@ function render(){const d=ctx.data.development||{};$("taskName").textContent=ctx
 function bindDevFields(){document.querySelectorAll("[data-dev]").forEach(el=>el.onchange=async()=>{await ctx.updateDevelopment({[el.dataset.dev]:el.value});await rebuildAnalysis();render()})}
 function renderAgent(){const el=$("agentResult");if(!agentResult){el.classList.remove("visible");el.innerHTML="";return}el.classList.add("visible");el.innerHTML="<div class=\"agent-meta\"><span>"+esc(agentResult.state==="error"?"Ошибка":agentResult.state==="loading"?"Анализ":"Результат анализа")+"</span></div><div class=\"agent-answer\">"+esc(agentResult.text)+"</div>"}
 async function injectBrowserNoteOverlay(){
- try{const tab=await getActiveTab();await ensureContentScript(tab.id);const r=await new Promise(resolve=>WC.api.tabs.sendMessage(tab.id,{type:"OPEN_NOTE_OVERLAY",contextName:ctx.data.name||"Задача разработки"},x=>resolve(WC.api.runtime.lastError?{ok:false,error:WC.api.runtime.lastError.message}:x)));if(!r?.ok)showError(r?.error||"Не удалось открыть заметку.")}
- catch(e){showError(e.message||String(e))}
+ try{
+  const r=await sendToPage({type:"OPEN_NOTE_OVERLAY",contextName:ctx.data.name||ctx.data.development?.name||"Задача разработки"});
+  if(!r?.ok)showError(r?.error||"Не удалось открыть заметку.");
+ }catch(e){showError(e.message||String(e))}
 }
 async function addMeeting(){const u=($("dionLink")?.value||"").trim();if(!/^https:\/\/dion\.vc\/event\/[^\s]+$/i.test(u)){showError("Укажите ссылку вида https://dion.vc/event/room");return}await ingest({type:"dion",title:"Встреча DION",text:"Ссылка на встречу: "+u,sourceReference:u,url:u});currentView="organization";render()}
 function handleClick(e){
