@@ -45,6 +45,9 @@ WC.analyze = {
     let n=0;for(const w of wb)if(wa.has(w))n++;
     return n>=2;
   },
+  requirements(ctx){const docs=ctx.documents.map(d=>({id:d.id,title:d.title,text:d.text}));return WC.requirements?WC.requirements.trace(docs):{requirements:[],links:[]};},
+  changes(ctx,baseIndex=0,targetIndex=1){if(ctx.documents.length<2)return {base:null,target:null,covered:[],missing:[],newInTarget:[]};return WC.requirements.coverage(ctx.documents[baseIndex],ctx.documents[targetIndex]);},
+  evidence(text,term){const s=WC.sentences(text);const t=String(term||"").toLowerCase().split(/\\W+/).filter(x=>x.length>3);return s.filter(x=>t.some(w=>x.toLowerCase().includes(w))).slice(0,5);},
   context(ctx){
     const tasks=[],questions=[],decisions=[],requirements=[];
     for(const d of ctx.documents){tasks.push(...WC.extract.tasks(d.text).map(x=>({text:x,source:d.title,sourceId:d.id})));
@@ -52,7 +55,7 @@ WC.analyze = {
       decisions.push(...WC.extract.decisions(d.text).map(x=>({text:x,source:d.title,sourceId:d.id})));
       requirements.push(...WC.extract.requirements(d.text).map(x=>({text:x,source:d.title,sourceId:d.id})));
     }
-    return {documents:ctx.documents.length,summary:this.summarize(ctx.documents.map(d=>d.text).join("\\n\\n"),12),tasks,questions,decisions,requirements,issues:this.contradictionPairs(ctx.documents)};
+    return {documents:ctx.documents.length,summary:this.summarize(ctx.documents.map(d=>d.text).join("\\n\\n"),12),tasks,questions,decisions,requirements,issues:this.contradictionPairs(ctx.documents),atomicRequirements:this.requirements(ctx),changes:this.changes(ctx)};
   },
   retrieve(ctx,query,limit=8){
     const terms=String(query||"").toLowerCase().split(/\\W+/).filter(x=>x.length>2);
