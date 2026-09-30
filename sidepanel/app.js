@@ -1,9 +1,11 @@
 const ctx=new WC.Context();let currentTab="task";const $=id=>document.getElementById(id);
-async function init(){await ctx.ready;$("taskName").value=ctx.data.name;$("taskName").onchange=async e=>{ctx.data.name=e.target.value||"Новая рабочая задача";await ctx.save()};render()}
+async function init(){await ctx.ready;$("taskName").value=ctx.data.name||"Новая рабочая задача";$("taskName").onchange=async e=>{ctx.data.name=e.target.value||"Новая рабочая задача";await ctx.save()};$("clearBtn").onclick=async()=>{if(!confirm("Очистить текущий рабочий контекст?"))return;await ctx.clear();await ctx.ready;$("taskName").value=ctx.data.name||"Новая рабочая задача";render()};render()}
 async function tab(){const t=await chrome.tabs.query({active:true,currentWindow:true});return t[0]}
 async function pageExtract(){const t=await tab();if(!t?.id)throw Error("Активная вкладка недоступна");await chrome.scripting.executeScript({target:{tabId:t.id},files:["content.js"]});return new Promise(r=>chrome.tabs.sendMessage(t.id,{type:"EXTRACT_PAGE"},x=>r(chrome.runtime.lastError?{ok:false,error:chrome.runtime.lastError.message}:x)))}
 async function ingest(d){const doc=WC.newDocument(d),a=WC.analyze.document(doc);Object.assign(doc,{facts:a.facts,requirements:a.requirements,questions:a.questions,tasks:a.tasks,decisions:a.decisions,terminology:a.terminology});await ctx.addDocument(doc);for(const x of a.tasks)await ctx.addTask({title:x,source:doc.title,deadline:WC.extract.dates(x)[0]||"Не определено",responsible:"Не определено"});for(const x of a.questions)await ctx.addQuestion({text:x,source:doc.title});for(const x of a.decisions)await ctx.addDecision({text:x,source:doc.title});render()}
-async function add(mode){try{if(mode==="file"||mode==="folder"){const i=document.createElement("input");i.type="file";i.accept=".txt,.md,.csv,.json,.xml,.html,.htm";if(mode==="folder")i.webkitdirectory=true;i.onchange=async()=>{for(const f of [...i.files]){if(f.size>5*1024*1024)continue;const text=await f.text();await ingest({type:"file",title:f.webkitRelativePath||f.name,text,sourceReference:f.name})}};i.click();return}const r=await pageExtract();if(!r.ok)throw Error(r.error);const text=mode==="selection"?r.data.selection:r.data.text;if(!text)throw Error("Текст не найден");await ingest({type:"web",title:r.data.title,url:r.data.url,text,sourceReference:r.data.url})}catch(e){alert("Не удалось прочитать источник.\\n\\n"+e.message)}}
+async function add(mode){try{if(mode==="file"||mode==="folder"){const i=document.createElement("input");i.type="file";i.accept=".txt,.md,.csv,.json,.xml,.html,.htm";if(mode==="folder")i.webkitdirectory=true;i.onchange=async()=>{for(const f of [...i.files]){if(f.size>5*1024*1024)continue;const text=await f.text();await ingest({type:"file",title:f.webkitRelativePath||f.name,text,sourceReference:f.name})}};i.click();return}const r=await pageExtract();if(!r.ok)throw Error(r.error);const text=mode==="selection"?r.data.selection:r.data.text;if(!text)throw Error("Текст не найден");await ingest({type:"web",title:r.data.title,url:r.data.url,text,sourceReference:r.data.url})}catch(e){alert("Не удалось прочитать источник.\
+\
+"+e.message)}}
 function esc(x){return WC.escape(String(x||""))}
 function taskView(){return `<div class="card"><h3>Рабочий контекст</h3><p class="muted">Добавляйте источники вручную. Данные обрабатываются локально.</p><div class="grid"><button class="btn primary" id="addPage">+ Текущая страница</button><button class="btn" id="addSelection">+ Выделение</button><button class="btn" id="addFile">+ Файл</button><button class="btn" id="addFolder">+ Папка</button></div></div><div class="card"><h3>Что уже собрано</h3><p>Документы: <b>${ctx.data.documents.length}</b> · Задачи: <b>${ctx.data.tasks.length}</b> · Вопросы: <b>${ctx.data.questions.length}</b> · Решения: <b>${ctx.data.decisions.length}</b></p></div><div class="card"><h3>Модель доверия</h3><p class="muted">READ → ANALYZE → SUGGEST → явное подтверждение. Автоматическая отправка и фоновые действия отсутствуют.</p></div>`}
 function docsView(){return `<div class="card"><div class="actionbar"><button class="btn primary" id="addPage">+ Страница</button><button class="btn" id="addSelection">+ Выделение</button><button class="btn" id="addFile">+ Файл</button><button class="btn" id="addFolder">+ Папка</button></div></div><div class="list">${ctx.data.documents.map(d=>`<div class="item"><b>${esc(d.title)}</b><small>${esc(d.type)} · ${WC.words(d.text).length} слов</small><div class="actionbar" style="margin-top:7px"><button class="btn" data-analyze="${d.id}">Разбор</button><button class="btn danger" data-remove="${d.id}">Удалить</button></div></div>`).join("")||'<div class="empty">Источники не добавлены.</div>'}</div>`}
@@ -17,7 +19,9 @@ function renderCoverage(r){$("analysisResult").innerHTML=`<div class="metric-gri
 function renderTrace(r){$("analysisResult").innerHTML=r.links.length?r.links.map(x=>`<article class="analysis-card"><div class="req-head"><span class="tag">${esc(x.relation)}</span><span class="confidence">Similarity ${x.score}</span></div><h4>${esc(x.a)} ↔ ${esc(x.b)}</h4><div class="evidence"><div>${esc(x.sourceA)} → ${esc(x.sourceB)}</div><span class="source">Связанные требования. Не является утверждением об их эквивалентности.</span></div></article>`).join(""):'<div class="empty">Связей между требованиями не найдено.</div>'}
 function renderConflicts(items){$("analysisResult").innerHTML=items.length?items.map((x,i)=>`<article class="analysis-card severity-medium"><div class="req-head"><span class="tag">Конфликт ${i+1}</span><span class="confidence">${esc(x.confidence)}</span></div><h4>${esc(x.title)}</h4><div class="evidence"><b>${esc(x.a.doc)}</b><div>${esc(x.a.text||x.a.values?.join(", "))}</div><b>${esc(x.b.doc)}</b><div>${esc(x.b.text||x.b.values?.join(", "))}</div><span class="source">Действие: ${esc(x.action)}</span></div></article>`).join(""):'<div class="empty">Явных потенциальных противоречий не найдено.</div>'}
 function chatView(){return `<div class="chat" id="chatLog"><div class="msg ai">FAST-режим: локальный детерминированный анализ. Доступны резюме, задачи, вопросы, решения, требования, противоречия и контекстный поиск.</div></div><div class="card"><textarea id="chatInput" placeholder="Например: что от меня хотят? какие требования есть? какие вопросы остались?"></textarea><button class="btn primary" id="ask">Анализировать</button></div>`}
-function show(text){const el=$("analysisResult");if(el)el.innerHTML=`<article class="analysis-card"><div class="evidence">${esc(text)}</div></article>`;else alert(text)}\nfunction render(){document.getElementById("docCount").textContent=ctx.data.documents.length+" документов";document.getElementById("taskCount").textContent=ctx.data.tasks.length+" задач";document.getElementById("issueCount").textContent=WC.analyze.contradictionPairs(ctx.data.documents).length+" проблем";const c=$("content");c.innerHTML={task:taskView,docs:docsView,mail:mailView,meetings:meetView,tasks:tasksView,analysis:analysisView,chat:chatView}[currentTab]();bind()}\nfunction bind(){
+function show(text){const el=$("analysisResult");if(el)el.innerHTML=`<article class="analysis-card"><div class="evidence">${esc(text)}</div></article>`;else alert(text)}
+function render(){document.getElementById("docCount").textContent=ctx.data.documents.length+" документов";document.getElementById("taskCount").textContent=ctx.data.tasks.length+" задач";document.getElementById("issueCount").textContent=WC.analyze.contradictionPairs(ctx.data.documents).length+" проблем";const c=$("content");c.innerHTML={task:taskView,docs:docsView,mail:mailView,meetings:meetView,tasks:tasksView,analysis:analysisView,chat:chatView}[currentTab]();bind()}
+function bind(){
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{currentTab=b.dataset.tab;document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("active",x===b));render()});
 ["addPage","addSelection","addFile","addFolder"].forEach(id=>document.querySelectorAll("#"+id).forEach(b=>b.onclick=()=>add({addPage:"page",addSelection:"selection",addFile:"file",addFolder:"folder"}[id])));
 if($("runReq"))$("runReq").onclick=()=>renderReqResults(ctx.data.documents.flatMap(d=>WC.requirements.atomicize(d.text,d.id,d.title)));
@@ -25,12 +29,36 @@ if($("runCoverage"))$("runCoverage").onclick=()=>{const a=$("baseDoc").value,b=$
 if($("runTrace"))$("runTrace").onclick=()=>renderTrace(WC.requirements.trace(ctx.data.documents));
 if($("runConflicts"))$("runConflicts").onclick=()=>renderConflicts(WC.analyze.contradictionPairs(ctx.data.documents));
 if($("mailIntent"))$("mailIntent").onclick=async()=>{const r=await WC.ai.ask("что от меня хотят?",ctx.data);alert(r.text)};
-if($("mailReply"))$("mailReply").onclick=async()=>{const r=await WC.ai.ask("что от меня хотят?",ctx.data);alert("Черновик ответа\\n\\nСпасибо, запрос получил.\\n\\nПо доступным материалам:\\n"+r.text+"\\n\\n[Проверьте факты перед отправкой.]")};
-if($("makeProtocol"))$("makeProtocol").onclick=async()=>{const t=$("meetingText").value.trim();if(!t)return alert("Добавьте текст заметок.");await ingest({type:"meeting-notes",title:"Заметки встречи",text:t});const a=WC.analyze.document({text:t,title:"Заметки"});alert("ПРОТОКОЛ\\n\\nОбсуждалось:\\n"+a.summary.join("\\n")+"\\n\\nРешения:\\n"+(a.decisions.join("\\n")||"Не определено")+"\\n\\nЗадачи:\\n"+(a.tasks.join("\\n")||"Не определено")+"\\n\\nВопросы:\\n"+(a.questions.join("\\n")||"Не определено"))};
+if($("mailReply"))$("mailReply").onclick=async()=>{const r=await WC.ai.ask("что от меня хотят?",ctx.data);alert("Черновик ответа\
+\
+Спасибо, запрос получил.\
+\
+По доступным материалам:\
+"+r.text+"\
+\
+[Проверьте факты перед отправкой.]")};
+if($("makeProtocol"))$("makeProtocol").onclick=async()=>{const t=$("meetingText").value.trim();if(!t)return alert("Добавьте текст заметок.");await ingest({type:"meeting-notes",title:"Заметки встречи",text:t});const a=WC.analyze.document({text:t,title:"Заметки"});alert("ПРОТОКОЛ\
+\
+Обсуждалось:\
+"+a.summary.join("\
+")+"\
+\
+Решения:\
+"+(a.decisions.join("\
+")||"Не определено")+"\
+\
+Задачи:\
+"+(a.tasks.join("\
+")||"Не определено")+"\
+\
+Вопросы:\
+"+(a.questions.join("\
+")||"Не определено"))};
 if($("addMeetingLink"))$("addMeetingLink").onclick=async()=>{const u=$("dionLink").value.trim();if(!/^https:\\/\\/dion\\.vc\\/event\\/[^\\s]+$/i.test(u))return alert("Ожидается ссылка вида https://dion.vc/event/названиекмнаты");await ingest({type:"dion",title:"Встреча DION",text:"Ссылка на встречу: "+u,sourceReference:u,url:u});$("meetingLinkResult").textContent="Встреча добавлена в Work Context: "+u};
 if($("ask"))$("ask").onclick=async()=>{const q=$("chatInput").value.trim();if(!q)return;const r=await WC.ai.ask(q,ctx.data);$("chatLog").innerHTML+=`<div class="msg user">${esc(q)}</div><div class="msg ai">${esc(r.text)}</div>`;$("chatInput").value=""};
 document.querySelectorAll("[data-remove]").forEach(b=>b.onclick=async()=>{await ctx.removeDocument(b.dataset.remove);render()});
 document.querySelectorAll("[data-analyze]").forEach(b=>b.onclick=()=>{const d=ctx.data.documents.find(x=>x.id===b.dataset.analyze);if(!d)return;currentTab="analysis";render();setTimeout(()=>renderReqResults(WC.requirements.atomicize(d.text,d.id,d.title)),0)});
 document.querySelectorAll("[data-calendar]").forEach(b=>b.onclick=()=>calendar(b.dataset.calendar));
 }
-;\ninit().catch(e=>{console.error(e);const el=document.getElementById("content");if(el)el.innerHTML="<div class=\"card\"><b>Work Copilot не запустился</b><p class=\"muted\">"+WC.escape(String(e.message||e))+"</p></div>";});\n
+;
+init().catch(e=>{console.error(e);const el=document.getElementById("content");if(el)el.innerHTML="<div class=\"card\"><b>Work Copilot не запустился</b><p class=\"muted\">"+WC.escape(String(e.message||e))+"</p></div>";});
