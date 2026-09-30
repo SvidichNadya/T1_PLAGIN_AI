@@ -5,6 +5,10 @@ const MAX_FILE_SIZE=5*1024*1024;
 async function init(){
  await ctx.ready;
  $("clearBtn").onclick=clearContext;
+ $("closeNote").onclick=closeNoteDialog;
+ $("cancelNote").onclick=closeNoteDialog;
+ $("saveNote").onclick=saveQuickNote;
+ $("noteText").addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();saveQuickNote()}});
  $("askAgent").onclick=()=>askAgent();
  $("agentInput").addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();askAgent()}});
  document.addEventListener("click",handleClick);
@@ -95,14 +99,12 @@ function organizationView(){return "<section><div class=\"section-head\"><h2>О�
 function render(){const d=ctx.data.development||{};$("taskName").textContent=ctx.data.name||"Новая разработка";$("docCount").textContent=ctx.data.documents.length+" источников";$("taskCount").textContent=ctx.data.workTasks.length+" рабочих задач";$("issueCount").textContent=(analysisCache?.issues||[]).length+" проблем";document.querySelectorAll(".main-nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===currentView));$("content").innerHTML={overview:overviewView,sources:sourcesView,analysis:analysisView,organization:organizationView}[currentView]();bindDevFields();renderAgent()}
 function bindDevFields(){document.querySelectorAll("[data-dev]").forEach(el=>el.onchange=async()=>{await ctx.updateDevelopment({[el.dataset.dev]:el.value});await rebuildAnalysis();render()})}
 function renderAgent(){const el=$("agentResult");if(!agentResult){el.classList.remove("visible");el.innerHTML="";return}el.classList.add("visible");el.innerHTML="<div class=\"agent-meta\"><span>"+esc(agentResult.state==="error"?"Ошибка":agentResult.state==="loading"?"Анализ":"Результат анализа")+"</span></div><div class=\"agent-answer\">"+esc(agentResult.text)+"</div>"}
-async function injectBrowserNoteOverlay(){
- try{
-  const r=await sendToPage({type:"OPEN_NOTE_OVERLAY",contextName:ctx.data.name||ctx.data.development?.name||"Задача разработки"});
-  if(!r?.ok)showError(r?.error||"Не удалось открыть заметку.");
- }catch(e){showError(e.message||String(e))}
-}
+function openNoteDialog(){const d=$("noteDialog");if(!d)return;d.hidden=false;$("noteText").value="";setTimeout(()=>$("noteText").focus(),0)}
+function closeNoteDialog(){const d=$("noteDialog");if(d)d.hidden=true}
+async function saveQuickNote(){const text=($("noteText")?.value||"").trim();if(!text)return;await ctx.addNote({title:"Быстрая заметка",text,contextName:ctx.data.development?.name||"Задача разработки"});closeNoteDialog();currentView="organization";render()}
 async function addMeeting(){const u=($("dionLink")?.value||"").trim();if(!/^https:\/\/dion\.vc\/event\/[^\s]+$/i.test(u)){showError("Укажите ссылку вида https://dion.vc/event/room");return}await ingest({type:"dion",title:"Встреча DION",text:"Ссылка на встречу: "+u,sourceReference:u,url:u});currentView="organization";render()}
 function handleClick(e){
+ if(e.target.closest("#notesBtn")){openNoteDialog();return}
  const v=e.target.closest("[data-view]");if(v){currentView=v.dataset.view;render();return}
  const q=e.target.closest("[data-agent-query]");if(q){$("agentInput").value=q.dataset.agentQuery;askAgent(q.dataset.agentQuery);return}
  const add=e.target.closest("[data-add]");if(add){if(add.dataset.add==="page")addPageOrSelection("page");else if(add.dataset.add==="selection")addPageOrSelection("selection");else if(add.dataset.add==="attachments")openAttachments();return}
