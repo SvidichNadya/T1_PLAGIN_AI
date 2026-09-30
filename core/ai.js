@@ -1,18 +1,10 @@
-window.WC = window.WC || {};
-WC.ai = {
-  available:false,
-  async ask(prompt,context){
-    return {mode:"deterministic",text:"Локальная языковая модель не подключена. Ниже выполнен безопасный детерминированный анализ доступного контекста.",data:this.fallback(prompt,context)};
-  },
-  fallback(prompt,ctx){
-    const text=ctx.documents.map(d=>d.text).join("\\n\\n");
-    const p=String(prompt).toLowerCase();
-    if(p.includes("кратко")||p.includes("резюме")||p.includes("сумм")) return this.format(WC.analyze.summarize(text,10));
-    if(p.includes("задач")) return this.format(WC.extract.tasks(text));
-    if(p.includes("вопрос")) return this.format(WC.extract.questions(text));
-    if(p.includes("решен")) return this.format(WC.extract.decisions(text));
-    if(p.includes("срок")||p.includes("дат")) return this.format(WC.extract.dates(text));
-    return "В текущем режиме доступны структурный анализ, извлечение фактов, задач, вопросов, решений и дат. Для семантического диалога требуется локальная модель, поставляемая отдельно утвержденным офлайн-пакетом.";
-  },
-  format(a){return Array.isArray(a)&&a.length?a.map(x=>"• "+x).join("\\n"):"Ничего не найдено."}
-};
+window.WC=window.WC||{};
+WC.ai={available:false,async ask(prompt,ctx){const p=String(prompt||"").toLowerCase();const a=WC.analyze.context(ctx);let title="Детерминированный локальный анализ";let text="";
+if(/противореч|конфликт|несоглас/.test(p))text=a.issues.length?a.issues.map((x,i)=>"Конфликт "+(i+1)+": "+x.title+"\n"+x.a.doc+": "+(x.a.text||x.a.values?.join(", ")||"")+"\n"+x.b.doc+": "+(x.b.text||x.b.values?.join(", ")||"")+"\nДействие: "+x.action).join("\n\n"):"Явных потенциальных противоречий не найдено.";
+else if(/требован|атомар/.test(p))text=a.atomicRequirements.length?a.atomicRequirements.slice(0,30).map(r=>r.id+" — "+r.raw+" ["+r.source+"]").join("\n"):"Требования не найдены.";
+else if(/пропущ|покры/.test(p)&&ctx.documents.length>=2){const r=WC.requirements.coverage(ctx.documents[0],ctx.documents[1]);text="Покрыто: "+r.covered.length+"\nПропущено: "+r.missing.length+"\nНовых в целевом: "+r.newInTarget.length;}
+else if(/задач|сделат|остал/.test(p))text=a.tasks.length?a.tasks.map(x=>"• "+x.text+" — "+x.source).join("\n"):"Рабочих задач из источников не найдено.";
+else if(/вопрос/.test(p))text=a.questions.length?a.questions.map(x=>"• "+x.text+" — "+x.source).join("\n"):"Открытых вопросов не найдено.";
+else if(/решен/.test(p))text=a.decisions.length?a.decisions.map(x=>"• "+x.text+" — "+x.source).join("\n"):"Решений не найдено.";
+else text=a.summary.length?a.summary.map(x=>"• "+x).join("\n"):"В контексте нет текста для анализа.";
+return{mode:"deterministic",title,text,data:a}}};
