@@ -1,3 +1,40 @@
 window.WC = window.WC || {};
-WC.newContext = () => ({version:1,id:WC.uid(),name:"Новая рабочая задача",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),documents:[],tasks:[],issues:[],decisions:[],questions:[],meetings:[],messages:[]});
-WC.newDocument = (d={}) => ({id:WC.uid(),type:d.type||"web",title:d.title||"Без названия",author:d.author||"",date:d.date||"",url:d.url||"",text:d.text||"",addedAt:new Date().toISOString(),facts:[],questions:[],tasks:[],decisions:[],issues:[]});
+WC.newContext = () => ({
+  version: 2,
+  id: WC.uid(),
+  name: "Новая рабочая задача",
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  mode: "EPHEMERAL",
+  documents: [],
+  tasks: [],
+  issues: [],
+  decisions: [],
+  questions: [],
+  meetings: [],
+  messages: []
+});
+WC.newDocument = (d={}) => ({
+  id: d.id || WC.uid(),
+  type: d.type || "web",
+  title: d.title || "Без названия",
+  author: d.author || "",
+  date: d.date || "",
+  url: d.url || "",
+  sourceReference: d.sourceReference || d.url || "",
+  text: d.text || "",
+  addedAt: d.addedAt || new Date().toISOString(),
+  sections: d.sections || [],
+  paragraphs: d.paragraphs || [],
+  tables: d.tables || [],
+  lists: d.lists || [],
+  links: d.links || [],
+  entities: d.entities || [],
+  facts: d.facts || [],
+  requirements: d.requirements || [],
+  decisions: d.decisions || [],
+  questions: d.questions || [],
+  tasks: d.tasks || [],
+  terminology: d.terminology || [],
+  issues: d.issues || []
+});
