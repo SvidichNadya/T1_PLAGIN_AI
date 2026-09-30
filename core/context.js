@@ -1,12 +1,14 @@
-window.WC = window.WC || {};
-WC.Context = class {
+window.WC=window.WC||{};
+WC.Context=class{
  constructor(){this.key="wc-session";this.data=WC.newContext();this.ready=this.load();}
- async load(){try{const x=await chrome.storage.session.get(this.key);if(x[this.key])this.data=x[this.key]}catch(e){}return this.data}
- async save(){this.data.updatedAt=new Date().toISOString();try{await chrome.storage.session.set({[this.key]:this.data})}catch(e){}}
- addDocument(d){this.data.documents.push(WC.newDocument(d));return this.save()}
- removeDocument(id){this.data.documents=this.data.documents.filter(x=>x.id!==id);return this.save()}
- clear(){this.data=WC.newContext();return this.save()}
- addTask(t){this.data.tasks.push({...t,id:WC.uid(),createdAt:new Date().toISOString()});return this.save()}
- addIssue(i){this.data.issues.push({...i,id:WC.uid(),createdAt:new Date().toISOString()});return this.save()}
- addQuestion(q){this.data.questions.push({...q,id:WC.uid(),createdAt:new Date().toISOString()});return this.save()}
+ async load(){try{const x=await WC.api.storage.session.get(this.key);if(x[this.key]){this.data={...WC.newContext(),...x[this.key]};this.data.development={...WC.newContext().development,...(x[this.key].development||{})};this.data.workTasks=x[this.key].workTasks||x[this.key].tasks||[];this.data.notes=x[this.key].notes||[];this.data.emails=x[this.key].emails||[];this.data.meetings=x[this.key].meetings||[]}}catch(e){}return this.data}
+ async save(){this.data.updatedAt=new Date().toISOString();try{await WC.api.storage.session.set({[this.key]:this.data})}catch(e){}}
+ async updateDevelopment(p){this.data.development={...this.data.development,...p};return this.save()}
+ async addDocument(d){this.data.documents.push(WC.newDocument(d));if(d.type==="mail")this.data.emails.push({documentId:this.data.documents.at(-1).id,title:d.title,source:d.sourceReference});if(d.type==="dion")this.data.meetings.push({id:WC.uid(),title:d.title,link:d.url||d.sourceReference,documentId:this.data.documents.at(-1).id});return this.save()}
+ async removeDocument(id){this.data.documents=this.data.documents.filter(x=>x.id!==id);this.data.emails=this.data.emails.filter(x=>x.documentId!==id);this.data.meetings=this.data.meetings.filter(x=>x.documentId!==id);return this.save()}
+ async clear(){this.data=WC.newContext();return this.save()}
+ async addTask(t){this.data.workTasks.push({...t,id:WC.uid(),createdAt:new Date().toISOString(),status:t.status||"open"});return this.save()}
+ async addQuestion(q){this.data.questions.push({...q,id:WC.uid()});return this.save()}
+ async addDecision(d){this.data.decisions.push({...d,id:WC.uid()});return this.save()}
+ async addNote(n){this.data.notes.push({...n,id:WC.uid(),createdAt:new Date().toISOString()});return this.save()}
 };
