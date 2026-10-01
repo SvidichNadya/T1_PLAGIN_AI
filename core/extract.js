@@ -2,7 +2,7 @@ globalThis.WC=globalThis.WC||{};
 WC.extract={
  _clean(s){return WC.clean(String(s||"")).replace(/[\u0000-\u001f]+/g," ").replace(/\s+/g," ").trim()},
  _norm(s){return this._clean(s).toLowerCase().replace(/ё/g,"е").replace(/[^а-яa-z0-9\s]/g," ").replace(/\s+/g," ").trim()},
- sentences(text){return this._clean(text).split(/(?<=[.!?])\s+|\n+/).map(x=>x.trim()).filter(Boolean)},
+ sentences(text){const raw=String(text||"").replace(/\r/g,"");return raw.split(/\n+/).flatMap(line=>line.split(/(?<=[.!?])\s+/)).map(x=>this._clean(x)).filter(x=>x.length>=3)}
  _meta(s){return /^(контекст|примечани|открытый вопрос|вопрос|ответ|сейчас проблема|проблематика|краткая выжимка|общими словами|разбить оценку|что сделать до встречи|утвердить правила|вариант доработки|т\.е\.?|итого)\b/i.test(s.trim())},
  _question(s){return /\?\s*$/.test(s.trim())||/^(кто|что|когда|где|как|зачем|почему|нужно ли|требуется ли|можно ли|есть ли|какой|какая|какие|какое|чем|или)\b/i.test(s.trim())},
  _requirement(s){return s.length>=25&&!this._question(s)&&!this._meta(s)&&/\b(должен|должна|должно|должны|обязан|обязана|обязаны|обязательно|необходимо|требуется|нельзя|запрещено|не допускается|не переносить|переносить|переносится|переносятся|проставляются|отображаются|ставить|снимать|можно|остается|убирается|автоматически|тянет|подгружает|перенос)\b/i.test(s)},

@@ -1,4 +1,4 @@
-window.WC=window.WC||{};
+globalThis.WC=globalThis.WC||{};
 WC.Context=class{
  constructor(){this.key="wc-session";this.data=WC.newContext();this.ready=this.load();}
  async load(){try{const x=await WC.api.storage.session.get(this.key);if(x[this.key]){this.data={...WC.newContext(),...x[this.key]};this.data.development={...WC.newContext().development,...(x[this.key].development||{})};this.data.workTasks=x[this.key].workTasks||x[this.key].tasks||[];this.data.notes=x[this.key].notes||[];this.data.emails=x[this.key].emails||[];this.data.meetings=x[this.key].meetings||[]}}catch(e){}return this.data}
