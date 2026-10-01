@@ -4,7 +4,8 @@ if(api.action?.onClicked){
  api.action.onClicked.addListener(async tab=>{
   try{
    if(tab?.id&&api.scripting?.executeScript){
-    await api.scripting.executeScript({target:{tabId:tab.id},files:["content.js"]});
+    const access=classifyPage(tab.url);if(!access.ok)throw Object.assign(new Error(access.reason),{code:access.code,url:tab.url||"",title:tab.title||""});
+ await api.scripting.executeScript({target:{tabId:tab.id},files:["content.js"]});
    }
   }catch(e){}
   try{
@@ -13,6 +14,7 @@ if(api.action?.onClicked){
   }catch(e){try{await api.sidePanel?.setPanelBehavior?.({openPanelOnActionClick:true})}catch(_){}}
  });
 }
+function classifyPage(url){const v=String(url||"");if(/^https?:\/\//i.test(v))return{ok:true};if(/^(chrome|edge|opera|brave|vivaldi|about|moz-extension|chrome-extension|view-source|devtools):/i.test(v))return{ok:false,code:"INTERNAL_PAGE",reason:"Эта служебная страница браузера недоступна для чтения расширением."};return{ok:false,code:"UNSUPPORTED_PAGE",reason:"Эта страница не поддерживает чтение содержимого расширением."};}
 async function pageRequest(message){
  const tabs=await api.tabs.query({active:true,lastFocusedWindow:true});
  const tab=tabs?.[0];

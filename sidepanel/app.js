@@ -5,10 +5,6 @@ const MAX_FILE_SIZE=5*1024*1024;
 async function init(){
  await ctx.ready;
  $("clearBtn").onclick=clearContext;
- $("closeNote").onclick=closeNoteDialog;
- $("cancelNote").onclick=closeNoteDialog;
- $("saveNote").onclick=saveQuickNote;
- $("noteText").addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();saveQuickNote()}});
  $("askAgent").onclick=()=>askAgent();
  $("agentInput").addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();askAgent()}});
  document.addEventListener("click",handleClick);
@@ -27,7 +23,7 @@ async function sendToPage(message){
 }
 async function pageExtract(mode){
  const r=await sendToPage({type:"EXTRACT_PAGE"});
- if(!r?.ok)throw Error(r?.error||"Не удалось прочитать текущую страницу.");
+ if(!r?.ok){const e=Error(r?.error||"Не удалось прочитать текущую страницу.");e.code=r.code;e.title=r.title;throw e}
  return mode==="selection"?{...r.data,text:r.data.selection}:r.data;
 }
 async function ingest(d){
@@ -39,12 +35,15 @@ async function ingest(d){
 }
 async function rebuildAnalysis(){analysisCache=WC.analyze.context(ctx.data);return analysisCache}
 function showError(message){agentResult={text:message,state:"error"};renderAgent()}
+function openTextImport(title=""){const m=$("textImportDialog");if(!m)return;m.hidden=false;$("textImportTitle").value=title;$("textImportText").value="";setTimeout(()=>$("textImportText").focus(),0)}
+function closeTextImport(){$("textImportDialog").hidden=true}
+async function saveTextImport(){const text=($("textImportText")?.value||"").trim();if(!text){showError("Добавьте текст источника.");return}const title=($("textImportTitle")?.value||"Локальный текст").trim()||"Локальный текст";closeTextImport();await ingest({type:"text",title,text,sourceReference:"Локально добавленный текст"})}
 async function addPageOrSelection(mode){
  try{
   const data=await pageExtract(mode);
   if(!data.text)throw Error(mode==="selection"?"На странице сейчас ничего не выделено.":"Не удалось извлечь текст текущей страницы.");
-  await ingest({type:mode==="selection"?"selection":"web",title:data.title||"Текущая страница",url:data.url, text:data.text,sourceReference:data.url});
- }catch(e){showError(e.message||String(e))}
+  await ingest({type:mode==="selection"?"selection":"web",title:data.title||"Текущая страница",url:data.url,text:data.text,sourceReference:data.url});
+ }catch(e){if(e.code==="INTERNAL_PAGE"||e.code==="UNSUPPORTED_PAGE"||e.code==="INJECTION_FAILED"){openTextImport(e.title||"");return}showError(e.message||String(e))}
 }
 function openAttachments(){
  const modal=$("attachmentsDialog");if(modal)modal.hidden=false;
@@ -99,16 +98,13 @@ function organizationView(){return "<section><div class=\"section-head\"><h2>О�
 function render(){const d=ctx.data.development||{};$("taskName").textContent=ctx.data.name||"Новая разработка";$("docCount").textContent=ctx.data.documents.length+" источников";$("taskCount").textContent=ctx.data.workTasks.length+" рабочих задач";$("issueCount").textContent=(analysisCache?.issues||[]).length+" проблем";document.querySelectorAll(".main-nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===currentView));$("content").innerHTML={overview:overviewView,sources:sourcesView,analysis:analysisView,organization:organizationView}[currentView]();bindDevFields();renderAgent()}
 function bindDevFields(){document.querySelectorAll("[data-dev]").forEach(el=>el.onchange=async()=>{await ctx.updateDevelopment({[el.dataset.dev]:el.value});await rebuildAnalysis();render()})}
 function renderAgent(){const el=$("agentResult");if(!agentResult){el.classList.remove("visible");el.innerHTML="";return}el.classList.add("visible");el.innerHTML="<div class=\"agent-meta\"><span>"+esc(agentResult.state==="error"?"Ошибка":agentResult.state==="loading"?"Анализ":"Результат анализа")+"</span></div><div class=\"agent-answer\">"+esc(agentResult.text)+"</div>"}
-function openNoteDialog(){const d=$("noteDialog");if(!d)return;d.hidden=false;$("noteText").value="";setTimeout(()=>$("noteText").focus(),0)}
-function closeNoteDialog(){const d=$("noteDialog");if(d)d.hidden=true}
-async function saveQuickNote(){const text=($("noteText")?.value||"").trim();if(!text)return;await ctx.addNote({title:"Быстрая заметка",text,contextName:ctx.data.development?.name||"Задача разработки"});closeNoteDialog();currentView="organization";render()}
+async function openBrowserNoteOverlay(){try{const r=await sendToPage({type:"OPEN_NOTE_OVERLAY",contextName:ctx.data.development?.name||ctx.data.name||"Задача разработки"});if(!r?.ok)showError(r?.error||"Не удалось открыть заметку поверх страницы.")}catch(e){showError(e.message||String(e))}}
 async function addMeeting(){const u=($("dionLink")?.value||"").trim();if(!/^https:\/\/dion\.vc\/event\/[^\s]+$/i.test(u)){showError("Укажите ссылку вида https://dion.vc/event/room");return}await ingest({type:"dion",title:"Встреча DION",text:"Ссылка на встречу: "+u,sourceReference:u,url:u});currentView="organization";render()}
 function handleClick(e){
- if(e.target.closest("#notesBtn")){openNoteDialog();return}
+ if(e.target.closest("#notesBtn")){openBrowserNoteOverlay();return}
  const v=e.target.closest("[data-view]");if(v){currentView=v.dataset.view;render();return}
  const q=e.target.closest("[data-agent-query]");if(q){$("agentInput").value=q.dataset.agentQuery;askAgent(q.dataset.agentQuery);return}
- const add=e.target.closest("[data-add]");if(add){if(add.dataset.add==="page")addPageOrSelection("page");else if(add.dataset.add==="selection")addPageOrSelection("selection");else if(add.dataset.add==="attachments")openAttachments();return}
- if(e.target.closest("#notesBtn")){injectBrowserNoteOverlay();return}
+ const add=e.target.closest("[data-add]");if(add){if(add.dataset.add==="page")addPageOrSelection("page");else if(add.dataset.add==="selection")addPageOrSelection("selection");else if(add.dataset.add==="attachments")openAttachments();else if(add.dataset.add==="text")openTextImport();return}
  if(e.target.closest("#closeAttachments")){closeAttachments();return}
  if(e.target.closest("#pickFiles")){pickFiles(false);return}
  if(e.target.closest("#pickFolder")){pickFiles(true);return}
@@ -117,5 +113,5 @@ function handleClick(e){
  const action=e.target.closest("[data-action]");if(action?.dataset.action==="addMeeting"){addMeeting();return}
 }
 $("filePicker")?.addEventListener("change",e=>processFiles(e.target.files));
-$("folderPicker")?.addEventListener("change",e=>processFiles(e.target.files));
+$("folderPicker")?.addEventListener("change",e=>processFiles(e.target.files));$("closeTextImport")?.addEventListener("click",closeTextImport);$("cancelTextImport")?.addEventListener("click",closeTextImport);$("saveTextImport")?.addEventListener("click",saveTextImport);$("textImportText")?.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();saveTextImport()}});
 init().catch(e=>{$("content").innerHTML="<div class=\"card\"><b>Work Copilot не запустился</b><p class=\"muted\">"+esc(e.message||e)+"</p></div>"});
