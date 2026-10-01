@@ -11,52 +11,6 @@ globalThis.WC=globalThis.WC||{};
  * A future corporate local LLM can be plugged in without changing tools,
  * chat UI, storage or the agent loop.
  */
-WC.AgentRuntime=class{
-  constructor(options={}){
-    this.tools=options.tools||{};
-    this.planner=options.planner;
-    this.synthesizer=options.synthesizer;
-    this.maxSteps=options.maxSteps||5;
-  }
-  listTools(){return Object.entries(this.tools).map(([name,t])=>({name,description:t.description||""}))}
-  async runTool(name,args,ctx){
-    const tool=this.tools[name];
-    if(!tool)throw Error("Неизвестный инструмент: "+name);
-    return await tool.run(ctx,args||{});
-  }
-  async run(prompt,ctx,history){
-    const steps=[],results=[];
-    for(let i=0;i<this.maxSteps;i++){
-      const decision=await this.planner({prompt,history,context:ctx,tools:this.listTools(),results,steps});
-      if(!decision||decision.done)break;
-      const name=decision.tool;
-      if(!name)break;
-      const started=Date.now();
-      try{
-        const result=await this.runTool(name,decision.args||{},ctx);
-        const record={tool:name,args:decision.args||{},result,durationMs:Date.now()-started};
-        results.push(record);
-        steps.push({tool:name,args:decision.args||{},observation:this.observe(record)});
-      }catch(e){
-        const record={tool:name,args:decision.args||{},error:String(e.message||e),durationMs:Date.now()-started};
-        results.push(record);
-        steps.push({tool:name,args:decision.args||{},observation:"ошибка: "+record.error});
-        break;
-      }
-    }
-    const final=await this.synthesizer({prompt,history,context:ctx,results,steps,tools:this.listTools()});
-    return {text:String(final?.text||""),results,steps};
-  }
-  observe(r){
-    if(r.error)return"ошибка инструмента";
-    const x=r.result||{};
-    if(r.tool==="search_sources")return"найдено "+((x.items||[]).length)+" релевантных источников";
-    if(r.tool==="inspect_source")return x.found?"изучен источник «"+x.source.title+"»":"источник не найден";
-    if(r.tool==="get_context_summary")return"получена сводка";
-    return"получено "+((x.items||[]).length)+" элементов";
-  }
-};
-
 WC.ai={
   key:"wc-chat",maxHistory:40,maxToolSteps:5,
   async loadHistory(){try{const x=await WC.api.storage.session.get(this.key);return Array.isArray(x[this.key])?x[this.key]:[]}catch(_){return[]}},
@@ -112,33 +66,9 @@ WC.ai={
     }
     return{ text:parts.filter(Boolean).join("\n\n")||"Я не нашёл достаточных данных в текущем контексте, чтобы ответить на вопрос. Уточни объект или добавь источник."};
   },
-  createRuntime(){
-    return new WC.AgentRuntime({
-      tools:this.tools,
-      planner:args=>this.deterministicPlanner(args),
-      synthesizer:args=>this.deterministicSynthesize(args),
-      maxSteps:this.maxToolSteps
-    });
-  },
-  /*
-   * Extension point for the future corporate local LLM.
-   * The provider must be local and may be registered later:
-   * WC.ai.setModelProvider({plan:async(...),synthesize:async(...)})
-   */
-  setModelProvider(provider){
-    if(!provider||typeof provider.plan!=="function"||typeof provider.synthesize!=="function")throw Error("Некорректный local model provider.");
-    this.modelProvider=provider;
-  },
-  createRuntimeWithProvider(provider){
-    const p=provider||this.modelProvider;
-    if(!p)return this.createRuntime();
-    return new WC.AgentRuntime({
-      tools:this.tools,
-      planner:args=>p.plan({...args,toolDefinitions:this.tools}),
-      synthesizer:args=>p.synthesize({...args,toolDefinitions:this.tools}),
-      maxSteps:this.maxToolSteps
-    });
-  },
+  createRuntime(provider){return new WC.AgentRuntime({tools:this.tools,planner:args=>provider.plan({...args,tools:Object.entries(this.tools).map(([name,t])=>({name,description:t.description||""}))}),synthesizer:args=>provider.synthesize({...args,tools:Object.entries(this.tools).map(([name,t])=>({name,description:t.description||""}))}),maxSteps:this.maxToolSteps})},
+  setModelProvider(provider){this.modelProvider=provider?WC.LLM.createProvider(provider):null},
+  createRuntimeWithProvider(provider){return this.createRuntime(provider||this.modelProvider||WC.LLM.createDeterministicProvider(this))},
   async ask(prompt,ctx){
     const q=String(prompt||"").trim();if(!q)throw Error("Введите вопрос.");
     const history=await this.loadHistory();

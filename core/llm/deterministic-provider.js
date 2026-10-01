@@ -1,0 +1,2 @@
+globalThis.WC=globalThis.WC||{};WC.LLM=WC.LLM||{};
+WC.LLM.createDeterministicProvider=function(ai){return{async plan(input){return ai.deterministicPlanner(input)},async synthesize(input){return ai.deterministicSynthesize(input)}}};
