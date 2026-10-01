@@ -1,4 +1,5 @@
-const ctx=new WC.Context();let currentView="overview",agentResult=null,analysisCache=null;\nasync function loadDomainConfig(){const r=await fetch("../config/domains.json",{cache:"no-store"});if(!r.ok)throw Error("Не удалось загрузить конфигурацию доменов.");globalThis.WC_DOMAIN_CONFIG=await r.json()}
+const ctx=new WC.Context();let currentView="overview",agentResult=null,analysisCache=null;
+async function loadDomainConfig(){const r=await fetch("../config/domains.json",{cache:"no-store"});if(!r.ok)throw Error("Не удалось загрузить конфигурацию доменов.");globalThis.WC_DOMAIN_CONFIG=await r.json()}
 const $=id=>document.getElementById(id),esc=x=>WC.escape(String(x??""));
 const SUPPORTED=/\.(txt|md|csv|json|xml|html?|log)$/i;
 const MAX_FILE_SIZE=5*1024*1024;
