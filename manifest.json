@@ -1,19 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Work Copilot",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Локальный корпоративный AI-помощник для анализа рабочего контекста и документов.",
-  "permissions": ["activeTab", "sidePanel", "storage", "scripting"],
-  "action": {
-    "default_title": "Work Copilot"
-  },
-  "background": {
-    "service_worker": "background.js"
-  },
-  "side_panel": {
-    "default_path": "sidepanel/index.html"
-  },
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self';"
-  }
+  "permissions": ["storage", "scripting", "tabs"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "action": {"default_title": "Work Copilot"},
+  "background": {"service_worker": "background.js"},
+  "side_panel": {"default_path": "sidepanel/index.html"},
+  "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'self';"}
 }

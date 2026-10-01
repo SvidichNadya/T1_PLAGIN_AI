@@ -19,5 +19,8 @@
     if(msg.type==="OPEN_NOTE_OVERLAY"){noteOverlay(msg.contextName||"Текущий контекст");sendResponse({ok:true});return}
     if(msg.type==="CLOSE_NOTE_OVERLAY"){document.getElementById("__wc_note_overlay")?.remove();sendResponse({ok:true});return}
     if(msg.type==="CREATE_CALENDAR_EVENT"){const e=msg.event||{};let changed=0;changed+=setValue(findLabel(["название","тема","title","subject"]),e.title)?1:0;changed+=setValue(findLabel(["дата","date"]),e.date)?1:0;changed+=setValue(findLabel(["время","time"]),e.time)?1:0;changed+=setValue(findLabel(["описание","description","комментар"]),e.description)?1:0;if(!changed){sendResponse({ok:false,error:"Не удалось определить поля календаря."});return}sendResponse({ok:true,fieldsChanged:changed,submitted:clickText(["создать","сохранить","добавить событие","create","save"])});return}
-  }catch(e){sendResponse({ok:false,error:String(e)})}});
+  }catch(e){sendResponse({ok:false,error:String(e)})}
+  };
+  window.__WC_RUNTIME_HANDLER__=handler;
+  runtime.runtime.onMessage.addListener(handler);
 })();
