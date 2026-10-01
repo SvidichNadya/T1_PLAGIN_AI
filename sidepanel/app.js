@@ -35,7 +35,7 @@ async function ingest(d){
  doc.tasks=(a.tasks||[]).map(x=>({...x,suggested:true}));
  await ctx.addDocument(doc);await rebuildAnalysis();render();
 }
-async function rebuildAnalysis(){analysisCache=WC.analyze.context(ctx.data);return analysisCache}
+async function rebuildAnalysis(){try{analysisCache=WC.analyze.context(ctx.data);return analysisCache}catch(e){console.error("Work Copilot: analysis failed",e);analysisCache={documents:ctx.data.documents.length,summary:[],requirements:[],questions:[],tasks:[],issues:[],decisions:[],facts:[],analysis:{error:String(e.message||e)}};return analysisCache}}
 function showError(message){agentResult={text:message,state:"error"};renderAgent()}
 function openTextImport(title=""){const m=$("textImportDialog");if(!m)return;m.hidden=false;$("textImportTitle").value=title;$("textImportText").value="";setTimeout(()=>$("textImportText").focus(),0)}
 function closeTextImport(){$("textImportDialog").hidden=true}
