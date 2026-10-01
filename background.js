@@ -4,9 +4,7 @@ const api=globalThis.browser||globalThis.chrome;
 const CONTENT_SCRIPT_ID="work-copilot-content";
 
 async function configuredOrigins(){
-  return Array.isArray(globalThis.WC_DOMAIN_ALLOWLIST)
-    ? globalThis.WC_DOMAIN_ALLOWLIST.filter(Boolean)
-    : [];
+  return Array.isArray(globalThis.WC_DOMAIN_ALLOWLIST)?globalThis.WC_DOMAIN_ALLOWLIST.filter(Boolean):[];
 }
 
 async function registerConfiguredContentScripts(){
@@ -34,18 +32,39 @@ async function ensureConfiguredAccess(){
   return true;
 }
 
-api.runtime.onInstalled.addListener(()=>{registerConfiguredContentScripts().catch(()=>{});});
-api.runtime.onStartup?.addListener(()=>{registerConfiguredContentScripts().catch(()=>{});});
+function configureSidePanel(){
+  try{
+    api.sidePanel?.setOptions?.({
+      path:"sidepanel/index.html",
+      enabled:true
+    }).catch?.(()=>{});
+    api.sidePanel?.setPanelBehavior?.({
+      openPanelOnActionClick:true
+    }).catch?.(()=>{});
+  }catch(_){}
+}
+
+api.runtime.onInstalled.addListener(()=>{
+  configureSidePanel();
+  registerConfiguredContentScripts().catch(()=>{});
+});
+
+api.runtime.onStartup?.addListener(()=>{
+  configureSidePanel();
+  registerConfiguredContentScripts().catch(()=>{});
+});
+
+configureSidePanel();
 
 if(api.action?.onClicked){
   api.action.onClicked.addListener(async tab=>{
+    try{await ensureConfiguredAccess();}catch(_){}
     try{
-      if(!(await ensureConfiguredAccess()))return;
-      if(tab?.id)try{await api.tabs.sendMessage(tab.id,{type:"TOGGLE_WORK_COPILOT"});}catch(_){}
-    }catch(_){}
-    try{
-      if(api.sidePanel?.open&&tab?.windowId!=null)await api.sidePanel.open({windowId:tab.windowId});
-    }catch(_){}
+      if(api.sidePanel?.open&&tab?.windowId!=null)
+        await api.sidePanel.open({windowId:tab.windowId});
+    }catch(_){
+      try{await api.sidePanel?.setPanelBehavior?.({openPanelOnActionClick:true});}catch(__){}
+    }
   });
 }
 
