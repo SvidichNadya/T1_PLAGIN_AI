@@ -60,6 +60,7 @@ WC.ai={
   createRuntime(provider){return new WC.AgentRuntime({tools:this.tools,planner:args=>provider.plan({...args,tools:Object.entries(this.tools).map(([name,t])=>({name,description:t.description||""}))}),synthesizer:args=>provider.synthesize({...args,tools:Object.entries(this.tools).map(([name,t])=>({name,description:t.description||""}))}),maxSteps:this.maxToolSteps})},
   setModelProvider(provider){this.modelProvider=provider?WC.LLM.createProvider(provider):null},
   createRuntimeWithProvider(provider){return this.createRuntime(provider||this.modelProvider||WC.LLM.createDeterministicProvider(this))},
+  analysisContext(ctx){const a=WC.analyze.context(ctx);return{...ctx,analysis:a};},
   async ask(prompt,ctx){
     const q=String(prompt||"").trim();if(!q)throw Error("Введите вопрос.");
     const history=await this.loadHistory();
@@ -67,8 +68,8 @@ WC.ai={
       const text="Привет. Я локальный аналитический агент Work Copilot. Я сам выбираю инструменты для работы с источниками и аналитикой текущей разработки. Сейчас в контексте "+ctx.documents.length+" источников.";
       const next=history.concat([{role:"user",text:q,at:new Date().toISOString()},{role:"assistant",text,at:new Date().toISOString(),tools:[]}]).slice(-this.maxHistory);await this.saveHistory(next);return{mode:"local-agent",text,history:next,steps:[]};
     }
-    const runtime=this.createRuntimeWithProvider(this.modelProvider);
-    const run=await runtime.run(q,ctx,history);
+    const analysis=this.analysisContext(ctx);\n    const runtime=this.createRuntimeWithProvider(this.modelProvider);
+    const run=await runtime.run(q,analysis,history);
     const next=history.concat([{role:"user",text:q,at:new Date().toISOString()},{role:"assistant",text:run.text,at:new Date().toISOString(),tools:run.steps.map(x=>x.tool),steps:run.steps}]).slice(-this.maxHistory);
     await this.saveHistory(next);
     return{mode:this.modelProvider?"local-llm-agent":"local-agent",text:run.text,history:next,steps:run.steps,toolResults:run.results};
