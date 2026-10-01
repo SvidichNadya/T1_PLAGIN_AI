@@ -1,10 +1,11 @@
-const ctx=new WC.Context();let currentView="overview",agentResult=null,analysisCache=null;
+const ctx=new WC.Context();let currentView="overview",agentResult=null,analysisCache=null,chatMessages=[];
 async function loadDomainConfig(){const r=await fetch("../config/domains.json",{cache:"no-store"});if(!r.ok)throw Error("Не удалось загрузить конфигурацию доменов.");globalThis.WC_DOMAIN_CONFIG=await r.json()}
 const $=id=>document.getElementById(id),esc=x=>WC.escape(String(x??""));
 const SUPPORTED=/\.(txt|md|csv|json|xml|html?|log)$/i;
 const MAX_FILE_SIZE=5*1024*1024;
 async function init(){
  await ctx.ready;
+ chatMessages=await WC.ai.loadHistory();
  $("clearBtn").onclick=clearContext;
  $("askAgent").onclick=()=>askAgent();
  $("agentInput").addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();askAgent()}});
@@ -84,11 +85,17 @@ async function processFiles(fileList){
  renderAgent();
 }
 async function askAgent(query){
- const q=(query||$("agentInput").value).trim();if(!q)return;
- const b=$("askAgent");b.disabled=true;agentResult={text:"Идёт локальный анализ всех материалов…",state:"loading"};renderAgent();
- try{const r=await WC.ai.ask(q,ctx.data);agentResult={text:r.text||"Недостаточно данных.",state:"ok"}}
- catch(e){agentResult={text:String(e.message||e),state:"error"}}
- finally{b.disabled=false;renderAgent()}
+ const input=$("agentInput"),q=(query||input.value).trim();if(!q)return;
+ const b=$("askAgent");b.disabled=true;
+ chatMessages.push({role:"user",text:q,at:new Date().toISOString()});renderAgent();
+ input.value="";
+ try{
+  const r=await WC.ai.ask(q,ctx.data);
+  chatMessages=r.history||chatMessages.concat({role:"assistant",text:r.text||"Недостаточно данных.",at:new Date().toISOString()});
+ }catch(e){
+  chatMessages.push({role:"error",text:String(e.message||e),at:new Date().toISOString()});
+ }
+ finally{b.disabled=false;renderAgent();input.focus()}
 }
 function overviewView(){
  const d=ctx.data.development||{},a=analysisCache||{};
@@ -113,7 +120,16 @@ function simpleFinding(type,text,source){return "<article class=\"mini-card\"><s
 function organizationView(){return "<section><div class=\"section-head\"><h2>Организация</h2><p>Встречи, письма, заметки и подтверждённые рабочие задачи связаны с контекстом, но управляются отдельно от аналитики.</p></div><div class=\"card\"><h3>Встречи DION</h3><p class=\"muted\">Открывать DION не нужно. Добавьте ссылку из письма или календаря.</p><div class=\"row\"><input id=\"dionLink\" placeholder=\"https://dion.vc/event/room\"><button class=\"btn primary\" data-action=\"addMeeting\">Добавить встречу</button></div><div class=\"list compact\">"+((ctx.data.meetings||[]).map(m=>"<div class=\"item\"><b>"+esc(m.title)+"</b><small>"+esc(m.link)+"</small></div>").join("")||"<div class=\"empty\">Встреч нет.</div>")+"</div></div><div class=\"card\"><h3>Письма</h3><div class=\"list\">"+((ctx.data.emails||[]).map(m=>"<div class=\"item\"><b>"+esc(m.title)+"</b><small>"+esc(m.source)+"</small></div>").join("")||"<div class=\"empty\">Письма не добавлены.</div>")+"</div></div><div class=\"card\"><h3>Рабочие задачи</h3><p class=\"muted\">Только подтверждённые пользователем конкретные действия.</p><div class=\"list\">"+((ctx.data.workTasks||[]).map(t=>"<div class=\"item\"><b>"+esc(t.title||t.text)+"</b><small>Срок: "+esc(t.deadline||"Не определено")+" · Ответственный: "+esc(t.responsible||"Не определено")+" · "+esc(t.source||"")+"</small></div>").join("")||"<div class=\"empty\">Рабочих задач пока нет.</div>")+"</div></div><div class=\"card\"><h3>Заметки</h3><div class=\"list\">"+((ctx.data.notes||[]).map(n=>"<div class=\"item\"><b>Заметка</b><small>"+esc(n.text)+"</small></div>").join("")||"<div class=\"empty\">Заметок пока нет.</div>")+"</div></div></section>"}
 function render(){const d=ctx.data.development||{};$("taskName").textContent=ctx.data.name||"Новая разработка";$("docCount").textContent=ctx.data.documents.length+" источников";$("taskCount").textContent=ctx.data.workTasks.length+" рабочих задач";$("issueCount").textContent=(analysisCache?.issues||[]).length+" проблем";document.querySelectorAll(".main-nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===currentView));$("content").innerHTML={overview:overviewView,sources:sourcesView,analysis:analysisView,organization:organizationView}[currentView]();bindDevFields();renderAgent()}
 function bindDevFields(){document.querySelectorAll("[data-dev]").forEach(el=>el.onchange=async()=>{await ctx.updateDevelopment({[el.dataset.dev]:el.value});await rebuildAnalysis();render()})}
-function renderAgent(){const el=$("agentResult");if(!agentResult){el.classList.remove("visible");el.innerHTML="";return}el.classList.add("visible");el.innerHTML="<div class=\"agent-meta\"><span>"+esc(agentResult.state==="error"?"Ошибка":agentResult.state==="loading"?"Анализ":"Результат анализа")+"</span></div><div class=\"agent-answer\">"+esc(agentResult.text)+"</div>"}
+function renderAgent(){
+ const el=$("agentResult");if(!el)return;
+ const messages=chatMessages.filter(x=>x.role==="user"||x.role==="assistant");
+ el.classList.toggle("visible",messages.length>0);
+ el.innerHTML=messages.map(m=>"<div class=\"chat-message "+m.role+"\"><div class=\"chat-meta\">"+(m.role==="user"?"Вы":"AI-аналитик")+"</div><div class=\"chat-bubble\">"+esc(m.text)+"</div></div>").join("");
+ if(agentResult?.state==="error"){
+  const e=$("agentErrors");if(e){e.hidden=false;e.textContent=agentResult.text}
+ }
+ el.scrollTop=el.scrollHeight;
+}
 function openBrowserNoteOverlay(){const m=$("quickNoteDialog");if(!m)return;m.hidden=false;$("quickNoteText").value="";setTimeout(()=>$("quickNoteText").focus(),0)}
 function closeQuickNote(){const m=$("quickNoteDialog");if(m)m.hidden=true}
 async function saveQuickNote(){const text=($("quickNoteText")?.value||"").trim();if(!text)return;const note={id:Date.now().toString(36)+Math.random().toString(36).slice(2,8),title:"Быстрая заметка",text,createdAt:new Date().toISOString(),contextName:ctx.data.development?.name||ctx.data.name||"Задача разработки"};ctx.data.notes=ctx.data.notes||[];ctx.data.notes.push(note);await ctx.save();closeQuickNote();render()}
