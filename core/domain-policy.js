@@ -1,2 +1,20 @@
-window.WC=window.WC||{};
-WC.domainPolicy={entries(){const v=(globalThis.WC_DOMAIN_CONFIG||{}).allowedDomains;return Array.isArray(v)?v.filter(x=>x&&typeof x.pattern==="string"):[]},match(url,pattern){try{return new URLPattern(pattern).test(String(url||""))}catch(_){return false}},find(url){return this.entries().find(x=>this.match(url,x.pattern))||null},isTrusted(url){return !!this.find(url)},origin(url){try{const u=new URL(url);if(!/^https?:$/i.test(u.protocol))return null;return u.origin+"/*"}catch(_){return null}},patterns(){return this.entries().map(x=>x.pattern)}};
+globalThis.WC=globalThis.WC||{};
+globalThis.WC.domainPolicy={
+  entries(){
+    const v=(globalThis.WC_DOMAIN_CONFIG||{}).allowedDomains;
+    return Array.isArray(v)?v.filter(x=>x&&typeof x.pattern==="string"):[];
+  },
+  match(url,pattern){
+    try{return new URLPattern(pattern).test(String(url||""))}catch(_){return false}
+  },
+  find(url){return this.entries().find(x=>this.match(url,x.pattern))||null},
+  isTrusted(url){return !!this.find(url)},
+  origin(url){
+    try{
+      const u=new URL(url);
+      if(!/^https?:$/i.test(u.protocol))return null;
+      return u.origin+"/*";
+    }catch(_){return null}
+  },
+  patterns(){return this.entries().map(x=>x.pattern)}
+};
