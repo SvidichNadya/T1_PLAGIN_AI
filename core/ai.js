@@ -68,7 +68,8 @@ WC.ai={
       const text="Привет. Я локальный аналитический агент Work Copilot. Я сам выбираю инструменты для работы с источниками и аналитикой текущей разработки. Сейчас в контексте "+ctx.documents.length+" источников.";
       const next=history.concat([{role:"user",text:q,at:new Date().toISOString()},{role:"assistant",text,at:new Date().toISOString(),tools:[]}]).slice(-this.maxHistory);await this.saveHistory(next);return{mode:"local-agent",text,history:next,steps:[]};
     }
-    const analysis=this.analysisContext(ctx);\n    const runtime=this.createRuntimeWithProvider(this.modelProvider);
+    const analysis=this.analysisContext(ctx);
+    const runtime=this.createRuntimeWithProvider(this.modelProvider);
     const run=await runtime.run(q,analysis,history);
     const next=history.concat([{role:"user",text:q,at:new Date().toISOString()},{role:"assistant",text:run.text,at:new Date().toISOString(),tools:run.steps.map(x=>x.tool),steps:run.steps}]).slice(-this.maxHistory);
     await this.saveHistory(next);
