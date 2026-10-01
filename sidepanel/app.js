@@ -1,4 +1,4 @@
-const ctx=new WC.Context();let currentView="overview",agentResult=null,analysisCache=null;
+const ctx=new WC.Context();let currentView="overview",agentResult=null,analysisCache=null;\nasync function loadDomainConfig(){const r=await fetch("../config/domains.json",{cache:"no-store"});if(!r.ok)throw Error("Не удалось загрузить конфигурацию доменов.");globalThis.WC_DOMAIN_CONFIG=await r.json()}
 const $=id=>document.getElementById(id),esc=x=>WC.escape(String(x??""));
 const SUPPORTED=/\.(txt|md|csv|json|xml|html?|log)$/i;
 const MAX_FILE_SIZE=5*1024*1024;
@@ -40,10 +40,25 @@ function closeTextImport(){$("textImportDialog").hidden=true}
 async function saveTextImport(){const text=($("textImportText")?.value||"").trim();if(!text){showError("Добавьте текст источника.");return}const title=($("textImportTitle")?.value||"Локальный текст").trim()||"Локальный текст";closeTextImport();await ingest({type:"text",title,text,sourceReference:"Локально добавленный текст"})}
 async function addPageOrSelection(mode){
  try{
+  const tabResult=await new Promise(resolve=>WC.api.runtime.sendMessage({type:"GET_TAB"},resolve));
+  const tab=tabResult?.tab;
+  if(!tab?.url)throw Error("Не удалось определить текущую страницу.");
+  const trusted=WC.domainPolicy.isTrusted(tab.url);
+  if(!trusted){
+    const origin=WC.domainPolicy.origin(tab.url);
+    if(!origin)throw Object.assign(new Error("Эта страница не поддерживает динамическое разрешение доступа."),{code:"NO_WEB_ORIGIN"});
+    const ok=confirm("Страница не входит в доверенный список Work Copilot.\n\nРазрешить расширению прочитать текущий сайт и добавить страницу в источник?");
+    if(!ok)return;
+    const access=await WC.PermissionManager.ensureDynamic(tab.url);
+    if(!access.ok)throw Object.assign(new Error(access.reason),{code:access.code});
+  }
   const data=await pageExtract(mode);
   if(!data.text)throw Error(mode==="selection"?"На странице сейчас ничего не выделено.":"Не удалось извлечь текст текущей страницы.");
   await ingest({type:mode==="selection"?"selection":"web",title:data.title||"Текущая страница",url:data.url,text:data.text,sourceReference:data.url});
- }catch(e){if(e.code==="INTERNAL_PAGE"||e.code==="UNSUPPORTED_PAGE"||e.code==="INJECTION_FAILED"){openTextImport(e.title||"");return}showError(e.message||String(e))}
+ }catch(e){
+  if(e.code==="UNSUPPORTED_PAGE"||e.code==="INJECTION_FAILED"){openTextImport(e.title||"");return}
+  showError(e.message||String(e))
+ }
 }
 function openAttachments(){
  const modal=$("attachmentsDialog");if(modal)modal.hidden=false;
