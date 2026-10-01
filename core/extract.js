@@ -1,15 +1,23 @@
-window.WC = window.WC || {};
-WC.extract = {
-  headings(text){return WC.clean(text).split("\n").map(x=>x.trim()).filter(Boolean).filter(x=>/^#{1,6}\s|^\d+(?:\.\d+)*[.)]?\s+|^[A-ZА-ЯЁ][^.!?]{2,100}$/.test(x)).slice(0,200)},
-  dates(text){const out=[];const rs=[/\b\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?\b/g,/\b(?:0?[1-9]|[12]\d|3[01])\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)(?:\s+\d{4})?\b/gi,/\b(?:сегодня|завтра|послезавтра|вчера)\b/gi];for(const re of rs){let m;while((m=re.exec(text))&&out.length<200)out.push(m[0])}return [...new Set(out)]},
-  times(text){return [...new Set((text.match(/\b(?:[01]?\d|2[0-3]):[0-5]\d\b/g)||[]))]},
-  emails(text){return [...new Set((text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)||[]))]},
-  links(text){return [...new Set((text.match(/https?:\/\/[^\s<>"')]+/gi)||[]))]},
-  questions(text){return WC.sentences(text).filter(s=>/[?]$|^(кто|что|когда|где|как|зачем|почему|нужно ли|требуется ли|можно ли|есть ли)\b/i.test(s.trim())).slice(0,150)},
-  tasks(text){return WC.sentences(text).filter(s=>/(^|\s)(нужно|необходимо|требуется|подготовить|проверить|согласовать|уточнить|предоставить|сделать|разработать|создать|отправить|провести|добавить|исправить|определить|описать|реализовать)\b/i.test(s.trim())).slice(0,150)},
-  decisions(text){return WC.sentences(text).filter(s=>/(решили|решение|согласовано|договорились|утверждено|принято|определили|зафиксировали|постановили)\b/i.test(s)).slice(0,150)},
-  requirements(text){return WC.sentences(text).filter(s=>/(должен|должна|должно|обязательно|запрещено|нельзя|требуется|необходимо|обязан|поддерживать|должны)\b/i.test(s)).slice(0,200)},
-  participants(text){return [...new Set((text.match(/(?:участники|участвуют|присутствуют|attendees|participants)\s*[:\-]\s*([^\n]+)/gi)||[]).map(x=>x.replace(/^.*?[:\-]\s*/,"").trim()))].slice(0,50)},
-  keyTerms(text){const ws=text.toLowerCase().match(/[a-zа-яё][a-zа-яё0-9_-]{4,}/gi)||[],stop=new Set("который которая которые также этого может могут будет были быть если когда где как что чтобы очень уже еще или для при это все один одна одно они мы вы она он его ее их вам нас над под после перед между".split(" ")),c={};for(const w of ws)if(!stop.has(w))c[w]=(c[w]||0)+1;return Object.entries(c).filter(([,n])=>n>=2).sort((a,b)=>b[1]-a[1]).slice(0,30).map(([term,count])=>({term,count}))},
-  sentences(text){return WC.sentences(text)}
+globalThis.WC=globalThis.WC||{};
+WC.extract={
+ _clean(s){return WC.clean(String(s||"")).replace(/[\u0000-\u001f]+/g," ").replace(/\s+/g," ").trim()},
+ _norm(s){return this._clean(s).toLowerCase().replace(/ё/g,"е").replace(/[^а-яa-z0-9\s]/g," ").replace(/\s+/g," ").trim()},
+ sentences(text){return this._clean(text).split(/(?<=[.!?])\s+|\n+/).map(x=>x.trim()).filter(Boolean)},
+ _meta(s){return /^(контекст|примечани|открытый вопрос|вопрос|ответ|сейчас проблема|проблематика|краткая выжимка|общими словами|разбить оценку|что сделать до встречи|утвердить правила|вариант доработки|т\.е\.?|итого)\b/i.test(s.trim())},
+ _question(s){return /\?\s*$/.test(s.trim())||/^(кто|что|когда|где|как|зачем|почему|нужно ли|требуется ли|можно ли|есть ли|какой|какая|какие|какое|чем|или)\b/i.test(s.trim())},
+ _requirement(s){return s.length>=25&&!this._question(s)&&!this._meta(s)&&/\b(должен|должна|должно|должны|обязан|обязана|обязаны|обязательно|необходимо|требуется|нельзя|запрещено|не допускается|не переносить|переносить|переносится|переносятся|проставляются|отображаются|ставить|снимать|можно|остается|убирается|автоматически|тянет|подгружает|перенос)\b/i.test(s)},
+ _task(s){return s.length>=30&&!this._question(s)&&/\b(запросить|получить|предоставить|подготовить|проверить|уточнить|согласовать|зафиксировать|создать|разработать|реализовать|описать|сопоставить|обсудить|разбить|вынести|определить|утвердить)\b/i.test(s)},
+ _sim(a,b){const wa=new Set(this._norm(a).match(/[а-яa-z]{4,}/g)||[]),wb=new Set(this._norm(b).match(/[а-яa-z]{4,}/g)||[]);let n=0;for(const w of wb)if(wa.has(w))n++;return n/Math.max(1,Math.min(wa.size,wb.size))},
+ dates(text){const out=[];for(const re of [/\b\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?\b/g,/\b(?:0?[1-9]|[12]\d|3[01])\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)(?:\s+\d{4})?\b/gi,/\b(?:сегодня|завтра|послезавтра|вчера)\b/gi]){let m;while((m=re.exec(text))&&out.length<200)out.push(m[0])}return[...new Set(out)]},
+ times(text){return[...new Set((text.match(/\b(?:[01]?\d|2[0-3]):[0-5]\d\b/g)||[]))]},
+ emails(text){return[...new Set((text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)||[]))]},
+ links(text){return[...new Set((text.match(/https?:\/\/[^\s<>"')]+/gi)||[]))]},
+ headings(text){return this._clean(text).split(/\n+/).map(x=>x.trim()).filter(Boolean).filter(x=>/^#{1,6}\s|^\d+(?:\.\d+)*[.)]?\s+/.test(x)).slice(0,100)},
+ _reason(q){const l=q.toLowerCase();if(/перенос|документ|договор|галочк|карточк/.test(l))return"Нужно зафиксировать источник, приёмник, тип документа и правило ручного изменения.";if(/буфер|окн|кнопк|функционал|поле/.test(l))return"Нужно определить текущее и ожидаемое поведение функционала.";if(/кто|роль|прав/.test(l))return"Нужно определить участника процесса и его права.";return"Нужно уточнить условие или ожидаемый результат."},
+ questions(text){const u=this.sentences(text),out=[];for(let i=0;i<u.length;i++){if(!this._question(u[i]))continue;let group=[u[i]],j=i+1;while(j<u.length&&this._question(u[j]))group.push(u[j++]);let p=i-1,ctx=[];while(p>=0&&ctx.length<3){if(!this._question(u[p])&&!this._meta(u[p])&&u[p].length>=45)ctx.unshift(u[p]);p--}let q=group.join(" ").replace(/\s+/g," ").trim(),base=ctx.join(" ");if(/^(если да|если нет|он|она|они|это|так|или он|или она|или они|а если|тогда)\b/i.test(q)&&base)q=base+" Уточнить: "+q;if(q.length<45&&base)q=base+" Уточнить: "+q;if(q.length<45)continue;out.push({text:q,context:base,reason:this._reason(q),evidence:group.join(" ")});i=j-1}const ded=[];for(const x of out)if(!ded.some(y=>this._sim(x.text,y.text)>=.72))ded.push(x);return ded.slice(0,50)},
+ requirements(text){const arr=this.sentences(text).filter(x=>this._requirement(x)),ded=[];for(const x of arr)if(!ded.some(y=>this._sim(x,y)>=.78))ded.push(x);return ded.slice(0,100)},
+ tasks(text){const arr=this.sentences(text).filter(x=>this._task(x)),ded=[];for(const x of arr)if(!ded.some(y=>this._sim(x,y)>=.75))ded.push(x);return ded.slice(0,50)},
+ decisions(text){return this.sentences(text).filter(s=>s.length>25&&/\b(решили|решение|согласовано|договорились|утверждено|принято|определили|зафиксировали|постановили)\b/i.test(s)).slice(0,80)},
+ participants(text){return[]},
+ keyTerms(text){const ws=this._norm(text).match(/[а-яa-z][а-яa-z0-9_-]{4,}/gi)||[],stop=new Set("который которая которые также этого может могут будет были быть если когда где как что чтобы очень уже еще или для при это все один одна одно они мы вы она он его ее их вам нас над под после перед между".split(" ")),c={};for(const w of ws)if(!stop.has(w))c[w]=(c[w]||0)+1;return Object.entries(c).filter(([,n])=>n>=2).sort((a,b)=>b[1]-a[1]).slice(0,30).map(([term,count])=>({term,count}))}
 };

@@ -19,6 +19,7 @@ WC.ai={
   tools:{
     search_sources:{description:"Ищет релевантные фрагменты по всем источникам.",run(ctx,a){const q=String(a.query||"").trim();if(!q)return{items:[]};return{items:WC.analyze.retrieve(ctx,q,8).map(d=>({id:d.id,title:d.title,type:d.type,evidence:WC.analyze.evidence(d.text,q).slice(0,5)})).filter(x=>x.evidence.length)}}},
     get_requirements:{description:"Возвращает извлечённые требования.",run(ctx){return{items:(WC.analyze.context(ctx).requirements||[]).slice(0,50)}}},
+    get_questions:{description:"Возвращает сгруппированные открытые вопросы с контекстом и основанием.",run(ctx){return{items:(WC.analyze.context(ctx).questions||[]).slice(0,50)}}},
     find_conflicts:{description:"Находит потенциальные противоречия.",run(ctx){return{items:(WC.analyze.context(ctx).issues||[]).slice(0,30)}}},
     get_tasks:{description:"Возвращает предложения рабочих задач.",run(ctx){return{items:(WC.analyze.context(ctx).tasks||[]).slice(0,30)}}},
     get_decisions:{description:"Возвращает явно зафиксированные решения.",run(ctx){return{items:(WC.analyze.context(ctx).decisions||[]).slice(0,30)}}},
@@ -55,17 +56,7 @@ WC.ai={
     if(["get_requirements","find_conflicts","get_tasks","get_decisions"].includes(last.tool)&&!has("search_sources"))return add("search_sources",{query:prompt});
     return{done:true};
   },
-  deterministicSynthesize({results}){
-    const parts=[];
-    for(const r of results){
-      if(r.error)continue;const d=r.result||{};
-      if(r.tool==="get_context_summary"&&(d.summary||[]).length)parts.push(d.summary.map(x=>"• "+x).join("\n"));
-      else if(r.tool==="search_sources"&&(d.items||[]).length)parts.push(d.items.map(x=>"**"+x.title+"**\n"+x.evidence.map(e=>"• "+e).join("\n")).join("\n\n"));
-      else if(r.tool==="inspect_source"&&d.found)parts.push("**"+d.source.title+"**\n"+d.source.text);
-      else if((d.items||[]).length)parts.push(d.items.slice(0,30).map(x=>"• "+(x.text||x.raw||JSON.stringify(x))).join("\n"));
-    }
-    return{ text:parts.filter(Boolean).join("\n\n")||"Я не нашёл достаточных данных в текущем контексте, чтобы ответить на вопрос. Уточни объект или добавь источник."};
-  },
+  deterministicSynthesize({prompt,context}){const a=WC.analyze.context(context),p=this.normalize(prompt);if(/противореч|конфликт|расхожд/.test(p))return{text:a.issues.length?a.issues.map(x=>"**"+x.title+"**\n"+x.a.text+" ↔ "+x.b.text+"\n"+x.action).join("\n\n"):"Расхождений не найдено."};if(/требован|пропущ|не покрыт/.test(p))return{text:a.requirements.length?"**Требования**\n"+a.requirements.slice(0,30).map(x=>"• "+x.raw+"\n  Объект: "+x.object+"\n  Действие: "+x.action+"\n  Условие: "+x.condition).join("\n\n"):"Требования не извлечены."};if(/вопрос|уточн|пробел/.test(p))return{text:a.questions.length?"**Открытые вопросы**\n"+a.questions.slice(0,24).map(x=>"• "+x.text+"\n  Основание: "+x.evidence+"\n  Зачем: "+x.reason).join("\n\n"):"Открытых вопросов не найдено."};if(/задач|дальше|сделать/.test(p))return{text:a.tasks.length?"**Предлагаемые действия**\n"+a.tasks.slice(0,24).map(x=>"• "+x.title+"\n  Источник: "+x.source).join("\n\n"):"Кандидатов действий не найдено."};return{text:"**Вывод анализа**\n"+a.summary.join("\n\n")+"\n\n**Что требует решения**\n"+a.questions.slice(0,6).map(x=>"• "+x.text).join("\n")};},
   createRuntime(provider){return new WC.AgentRuntime({tools:this.tools,planner:args=>provider.plan({...args,tools:Object.entries(this.tools).map(([name,t])=>({name,description:t.description||""}))}),synthesizer:args=>provider.synthesize({...args,tools:Object.entries(this.tools).map(([name,t])=>({name,description:t.description||""}))}),maxSteps:this.maxToolSteps})},
   setModelProvider(provider){this.modelProvider=provider?WC.LLM.createProvider(provider):null},
   createRuntimeWithProvider(provider){return this.createRuntime(provider||this.modelProvider||WC.LLM.createDeterministicProvider(this))},
